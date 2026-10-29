@@ -1,0 +1,5 @@
+2026-10-28 20:12:45 INFO service=payment Payment service started
+2026-10-28 20:12:50 WARNING service=payment Database connection pool is high
+2026-10-28 20:13:01 ERROR service=payment Database connection timed out
+2026-10-28 20:13:05 ERROR service=payment Database connection timed out
+2026-10-28 20:13:10 INFO service=payment Retrying database connection

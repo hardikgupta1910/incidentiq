@@ -29,3 +29,22 @@ class Incident(BaseModel):
     total_log_lines:int
     error_count:int
     events: list[LogEvent]
+
+
+class EvidenceReference(BaseModel):
+    source_type:str
+    line_number: int
+    message:str
+
+
+class Hypothesis(BaseModel):
+    rank:int
+    summary: str
+    confidence: float=Field(ge=0, le=1)
+    evidence: list[EvidenceReference]
+    suggested_checks: list[str]
+
+class InvestigationResult(BaseModel):
+    incident_id:UUID
+    status: str
+    hypotheses: list[Hypothesis]
