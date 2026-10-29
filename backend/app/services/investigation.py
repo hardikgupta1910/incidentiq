@@ -7,6 +7,7 @@ from app.schemas import (
 )
 import logging
 from app.services.ollama_provider import investigate_with_local_ai
+from app.services.retrieval import retrieve_runbook_context
 
 
 logger = logging.getLogger(__name__)
@@ -102,16 +103,23 @@ def investigate_with_rules(incident: Incident) -> InvestigationResult:
 
 
 def investigate_incident(incident:Incident)-> InvestigationResult:
-    log_text="\n".join(event.message for event in incident.events)
+    log_text = "\n".join(
+    f"Line {event.line_number}: {event.message}"
+    for event in incident.events
+)
+
+    runbook_context = retrieve_runbook_context(log_text)
 
     try:
         return investigate_with_local_ai(
             incident_id=str(incident.id),
-            log_text=log_text)
+            log_text=log_text,
+            runbook_context=runbook_context,
+        )
     except Exception:
         logger.exception(
-            "Local AI investigation failed for incident %S; using rule-based fallback",
-            incident.id
+            "Local AI investigation failed for incident %s; using rule-based fallback.",
+            incident.id,
         )
         return investigate_with_rules(incident)
 

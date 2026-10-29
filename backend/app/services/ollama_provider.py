@@ -10,8 +10,12 @@ client=OpenAI(
 )
 
 
-def investigate_with_local_ai(incident_id: str,log_text: str,) -> InvestigationResult:
-
+def investigate_with_local_ai(
+    incident_id: str,
+    log_text: str,
+    runbook_context: str,
+) -> InvestigationResult:
+    
     response=client.chat.completions.create(
         model=MODEL_NAME,
         temperature=0,
@@ -30,13 +34,19 @@ def investigate_with_local_ai(incident_id: str,log_text: str,) -> InvestigationR
                     "ranked hypotheses, never claim certainty, and use only "
                     "the supplied log lines as evidence. Each evidence item "
                     "must contain an actual line number and exact log message "
-                    "from the supplied logs. Return valid JSON only.")
+                    "from the supplied logs. Return valid JSON only."
+                    "Use retrieved runbook context only for suggested checks; "
+                    "do not treat it as evidence of what occurred. "
+                    "Evidence must contain only source_type='log' items copied from supplied logs. "
+"Never include runbook text in evidence. Use retrieved runbooks only to create "
+"MySQL-specific suggested checks. ")
             },
             {
                 "role":"user",
                 "content":(
                     f"Incident ID: {incident_id}\n\n"
                     f"logs:\n{log_text}"
+                    f"Retrieved runbook context:\n{runbook_context}"
                 )
             },
         ],
@@ -45,7 +55,7 @@ def investigate_with_local_ai(incident_id: str,log_text: str,) -> InvestigationR
     content= response.choices[0].message.content or ""
 
     if not content:
-        raise ValueError("Local model resturned Empty Response")
+        raise ValueError("Local model returned Empty Response")
 
     model_result= InvestigationResult.model_validate_json(content)
 
