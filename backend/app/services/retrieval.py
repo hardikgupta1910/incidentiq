@@ -1,6 +1,6 @@
 from openai import OpenAI
 from qdrant_client import QdrantClient
-
+from app.schemas import RetrievedSource
 
 COLLECTION_NAME = "runbooks"
 EMBEDDING_MODEL = "nomic-embed-text:latest"
@@ -14,7 +14,7 @@ qdrant_client = QdrantClient(url="http://localhost:6333")
 
 
 
-def retrieve_runbook_context(query:str, limit:int=3)->str:
+def retrieve_runbook_context(query:str, limit:int=3)->tuple[str,list[RetrievedSource]]:
     embedding_response=ollama_client.embeddings.create(
         model=EMBEDDING_MODEL,
         input=query
@@ -31,18 +31,30 @@ def retrieve_runbook_context(query:str, limit:int=3)->str:
     )
 
 
-    chunks: list[str]=[]
+    context_chunks: list[str]=[]
+    retrieved_sources: list[RetrievedSource]=[]
 
     for point in results.points:
-        payload=point.payload or []
+        payload=point.payload or {}
         text=payload.get("text")
 
-        if text:
-            source_file = payload.get("source_file", "unknown")
-            chunk_index = payload.get("chunk_index", "unknown")
+        if not text:
+            continue
 
-            chunks.append(
-                f"[Source: {source_file}, chunk: {chunk_index}]\n{text}"
+        source_file = payload.get("source_file", "unknown")
+        chunk_index = payload.get("chunk_index", "unknown")
+
+        context_chunks.append(
+            f"[Source: {source_file}, chunk: {chunk_index}]\n{text}"
+        )
+
+        retrieved_sources.append(
+            RetrievedSource(
+                source_file=source_file,
+                chunk_index=chunk_index,
+                score=point.score,
+                text=text,
             )
+        )
 
-    return "\n\n---\n\n".join(chunks)
+    return "\n\n---\n\n".join(context_chunks), retrieved_sources

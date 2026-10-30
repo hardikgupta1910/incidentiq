@@ -20,16 +20,6 @@ class LogEvent(BaseModel):
     service:Optional[str]=None
     message: str
 
-class Incident(BaseModel):
-    id: UUID=Field(default_factory=uuid4)
-    title:str
-    status:str="created"
-    created_at:datetime=Field(default_factory=datetime.now)
-    source_filename:str
-    total_log_lines:int
-    error_count:int
-    events: list[LogEvent]
-
 
 class EvidenceReference(BaseModel):
     source_type:str
@@ -62,17 +52,33 @@ class Hypothesis(BaseModel):
 
         return self
 
+class RetrievedSource(BaseModel):
+    source_file: str
+    chunk_index: int
+    score: float
+    text: str
+
+
 class InvestigationResult(BaseModel):
     incident_id:UUID
     status: str
     hypotheses: list[Hypothesis]
     retrieved_sources: list[RetrievedSource] = []
 
+class Incident(BaseModel):
+    id: UUID=Field(default_factory=uuid4)
+    title:str
+    status:str="created"
+    created_at:datetime=Field(default_factory=datetime.now)
+    source_filename:str
+    total_log_lines:int
+    error_count:int
+    events: list[LogEvent]
+    investigation: Optional[InvestigationResult] = None
 
 
 
-class RetrievedSource(BaseModel):
-    source_file: str
-    chunk_index: int
-    score: float
-    text: str
+
+
+
+

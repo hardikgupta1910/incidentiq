@@ -108,13 +108,17 @@ def investigate_incident(incident:Incident)-> InvestigationResult:
     for event in incident.events
 )
 
-    runbook_context = retrieve_runbook_context(log_text)
+    runbook_context, retrieved_sources = retrieve_runbook_context(log_text)
 
     try:
-        return investigate_with_local_ai(
-            incident_id=str(incident.id),
-            log_text=log_text,
-            runbook_context=runbook_context,
+        ai_result = investigate_with_local_ai(
+        incident_id=str(incident.id),
+        log_text=log_text,
+        runbook_context=runbook_context,
+        )
+
+        return ai_result.model_copy(
+            update={"retrieved_sources": retrieved_sources}
         )
     except Exception:
         logger.exception(

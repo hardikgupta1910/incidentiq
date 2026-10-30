@@ -47,13 +47,7 @@ async def create_incident(file: UploadFile=File(...))-> Incident:
         for event in events
     )
 
-    # return Incident(
-    #     title=f"Uploaded incident: {filename}",
-    #     source_filename=filename,
-    #     total_log_lines=len(events),
-    #     error_count=error_count,
-    #     events=events,
-    #)
+    
     incident = Incident(
         title=f"Uploaded incident: {filename}",
         source_filename=filename,
@@ -91,4 +85,12 @@ def investigate(incident_id: UUID) -> InvestigationResult:
             detail="Incident not found. Upload the log again before investigating.",
         )
 
-    return investigate_incident(incident)
+    result= investigate_incident(incident)
+
+
+    incident.investigation=result
+    incident.status="completed"
+
+    incidents[incident_id]=incident
+
+    return result
