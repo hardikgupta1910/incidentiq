@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment secrets
+.env
+backend/app/.env
+
+# Test and tool caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Docker/local data
+qdrant_storage/
+mysql_data/
+
+# OS files
+.DS_Store
+Thumbs.db
