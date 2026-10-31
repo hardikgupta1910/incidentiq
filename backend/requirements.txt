@@ -6,3 +6,6 @@ openai
 qdrant-client
 sqlalchemy
 pymysql
+pytest
+httpx
+pydantic-settings

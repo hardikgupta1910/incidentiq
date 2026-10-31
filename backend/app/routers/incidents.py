@@ -1,33 +1,37 @@
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
-
-from app.schemas import Incident, Severity
-from app.services.log_parser import parse_logs
 from uuid import UUID
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from sqlalchemy.orm import Session
+
+from app.database import get_db
 from app.schemas import Incident, InvestigationResult, Severity
 from app.services.investigation import investigate_incident
-from app.storage import incidents
+from app.services.log_parser import parse_logs
+from app.storage import create_incident, get_incident, save_investigation
+from app.data.seed_incidents import SEED_INCIDENTS
 
-router =APIRouter(prefix="/api/incidents", tags=["Incidents"])
+router = APIRouter(prefix="/api/incidents", tags=["Incidents"])
 
-
-ALLOWED_EXTENSIONS={".log", ".txt"}
-MAX_FILE_SIZE_BYTES=1_000_000
+ALLOWED_EXTENSIONS = {".log", ".txt"}
+MAX_FILE_SIZE_BYTES = 1_000_000
 
 
 @router.post("", response_model=Incident, status_code=status.HTTP_201_CREATED)
-
-async def create_incident(file: UploadFile=File(...))-> Incident:
-
-    filename=file.filename or""
+async def create_incident_route(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> Incident:
+    filename = file.filename or ""
 
     if not filename.lower().endswith(tuple(ALLOWED_EXTENSIONS)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="only .log and .text files are allowed",
+            detail="Only .log and .txt files are allowed.",
         )
-    content= await file.read()
 
-    if len(content)>MAX_FILE_SIZE_BYTES:
+    content = await file.read()
+
+    if len(content) > MAX_FILE_SIZE_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail="File must be 1 MB or smaller.",
@@ -41,13 +45,13 @@ async def create_incident(file: UploadFile=File(...))-> Incident:
             detail="File must be UTF-8 encoded text.",
         ) from error
 
-    events=parse_logs(log_content)
-    error_count=sum(
+    events = parse_logs(log_content)
+
+    error_count = sum(
         event.severity in {Severity.ERROR, Severity.CRITICAL}
         for event in events
     )
 
-    
     incident = Incident(
         title=f"Uploaded incident: {filename}",
         source_filename=filename,
@@ -56,16 +60,20 @@ async def create_incident(file: UploadFile=File(...))-> Incident:
         events=events,
     )
 
-    incidents[incident.id] = incident
+    return create_incident(db, incident)
 
-    return incident
+
+@router.get("/seed", response_model=list[Incident])
+def list_seed_incidents():
+    return SEED_INCIDENTS
 
 
 
 
 @router.get("/{incident_id}", response_model=Incident)
-def get_incident(incident_id: UUID) -> Incident:
-    incident = incidents.get(incident_id)
+def get_incident_route(incident_id: UUID,db: Session = Depends(get_db),) -> Incident:
+    
+    incident = get_incident(db, incident_id)
 
     if incident is None:
         raise HTTPException(
@@ -75,9 +83,16 @@ def get_incident(incident_id: UUID) -> Incident:
 
     return incident
 
-@router.post("/{incident_id}/investigate", response_model=InvestigationResult)
-def investigate(incident_id: UUID) -> InvestigationResult:
-    incident = incidents.get(incident_id)
+
+@router.post(
+    "/{incident_id}/investigate",
+    response_model=InvestigationResult,
+)
+def investigate(
+    incident_id: UUID,
+    db: Session = Depends(get_db),
+) -> InvestigationResult:
+    incident = get_incident(db, incident_id)
 
     if incident is None:
         raise HTTPException(
@@ -85,12 +100,16 @@ def investigate(incident_id: UUID) -> InvestigationResult:
             detail="Incident not found. Upload the log again before investigating.",
         )
 
-    result= investigate_incident(incident)
+    result = investigate_incident(incident)
 
 
-    incident.investigation=result
-    incident.status="completed"
+    save_investigation(
+        db=db,
+        incident_id=incident_id,
+        result=result
+    )
 
-    incidents[incident_id]=incident
-
+    # This update function comes next; leave these two lines out for now.
     return result
+
+

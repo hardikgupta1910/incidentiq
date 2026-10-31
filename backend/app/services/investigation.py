@@ -8,7 +8,13 @@ from app.schemas import (
 import logging
 from app.services.ollama_provider import investigate_with_local_ai
 from app.services.retrieval import retrieve_runbook_context
+from app.settings import settings
 
+
+def call_hosted_provider(*args, **kwargs):
+    raise RuntimeError(
+        "Hosted provider calls require privacy mode to be disabled."
+    )
 
 logger = logging.getLogger(__name__)
 def investigate_with_rules(incident: Incident) -> InvestigationResult:
@@ -103,6 +109,14 @@ def investigate_with_rules(incident: Incident) -> InvestigationResult:
 
 
 def investigate_incident(incident:Incident)-> InvestigationResult:
+
+    if settings.local_privacy_mode:
+        raise PermissionError(
+            "Local privacy mode is enabled. "
+            "Hosted provider inference is not allowed."
+        )
+
+
     log_text = "\n".join(
     f"Line {event.line_number}: {event.message}"
     for event in incident.events

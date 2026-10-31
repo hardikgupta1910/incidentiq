@@ -46,7 +46,7 @@ class IncidentRecord(Base):
         JSON,
         nullable=False
     )
-    investigation=Mapped[dict|None]=mapped_column(
+    investigation:Mapped[dict | None]=mapped_column(
         JSON,
         nullable=True,
     )

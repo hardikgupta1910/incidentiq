@@ -1,12 +1,12 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from app.settings import settings
 
 
 
-DATABASE_URL = (
-    "mysql+pymysql://incidentiq:incidentiq-local-password"
-    "@127.0.0.1:3307/incidentiq"
-)
+
+
+DATABASE_URL = settings.database_url
 
 engine=create_engine(
     DATABASE_URL,
