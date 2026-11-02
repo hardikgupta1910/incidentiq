@@ -1,5 +1,7 @@
 from datetime import datetime
 from uuid import uuid4
+import uuid
+from datetime import datetime
 
 from sqlalchemy import DateTime, Integer, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -49,4 +51,28 @@ class IncidentRecord(Base):
     investigation:Mapped[dict | None]=mapped_column(
         JSON,
         nullable=True,
+    )
+
+
+
+class UserRecord(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+
+    username: Mapped[str] = mapped_column(
+        String(100),
+        unique=True,
+        index=True,
+    )
+
+    hashed_password: Mapped[str] = mapped_column(String(255))
+    role: Mapped[str] = mapped_column(String(20), default="engineer")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=datetime.utcnow,
     )

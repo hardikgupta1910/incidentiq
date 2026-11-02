@@ -1,6 +1,6 @@
 import time
 from uuid import UUID
-
+from app.auth.security import require_admin
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -85,10 +85,11 @@ def calculate_diagnosis_quality(
 def run_evaluation(
     incident_id: UUID,
     providers: str = Query(
-        default="ollama,groq,cloudflare",
+        default="ollama,groq,openrouter",
         description="Comma-separated providers to evaluate",
     ),
     db: Session = Depends(get_db),
+    current_user=Depends(require_admin),
 ):
     incident = get_incident(db, incident_id)
 

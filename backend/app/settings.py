@@ -13,10 +13,10 @@ class Settings(BaseSettings):
     local_privacy_mode: bool = True
 
     model_config = SettingsConfigDict(
-        env_file=ENV_FILE,
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
+    env_file=Path(__file__).resolve().parent.parent / ".env",
+    env_file_encoding="utf-8",
+    extra="ignore",
+)
 
 
 settings = Settings()

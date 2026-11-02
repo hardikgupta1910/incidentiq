@@ -12,3 +12,5 @@ httpx
 requests
 langgraph
 pytest
+pwdlib[argon2]
+pyjwt

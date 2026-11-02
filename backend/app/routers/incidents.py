@@ -1,8 +1,8 @@
 from uuid import UUID
-
+from app.auth.security import get_current_user
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
-
+from app.auth.security import get_current_user
 from app.database import get_db
 from app.schemas import Incident, InvestigationResult, Severity
 from app.services.investigation import investigate_incident
@@ -12,8 +12,11 @@ from app.data.seed_incidents import (
     SEED_INCIDENTS,
     database_connection_incident,
 )
-router = APIRouter(prefix="/api/incidents", tags=["Incidents"])
-
+router = APIRouter(
+    prefix="/api/incidents",
+    tags=["Incidents"],
+    dependencies=[Depends(get_current_user)],
+)
 ALLOWED_EXTENSIONS = {".log", ".txt"}
 MAX_FILE_SIZE_BYTES = 1_000_000
 
@@ -112,6 +115,7 @@ def get_incident_route(incident_id: UUID,db: Session = Depends(get_db),) -> Inci
 def investigate(
     incident_id: UUID,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ) -> InvestigationResult:
     incident = get_incident(db, incident_id)
 
