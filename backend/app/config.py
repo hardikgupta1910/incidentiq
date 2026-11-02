@@ -22,13 +22,7 @@ class Settings:
         "llama-3.3-70b-versatile",
     )
 
-    CLOUDFLARE_ACCOUNT_ID: str | None = os.getenv("CLOUDFLARE_ACCOUNT_ID") or None
-    CLOUDFLARE_API_TOKEN: str | None = os.getenv("CLOUDFLARE_API_TOKEN") or None
-    CLOUDFLARE_WORKERS_AI_MODEL: str = os.getenv(
-        "CLOUDFLARE_WORKERS_AI_MODEL",
-        "@cf/meta/llama-3.1-8b-instruct",
-    )
-
+    
     PRIVACY_MODE: bool = os.getenv("PRIVACY_MODE", "false").lower() == "true"
 
 

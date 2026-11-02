@@ -10,8 +10,7 @@ from app.services.redaction import redact_text
 from app.schemas import InvestigationResult
 from app.ai.ollama_provider import investigate_with_local_ai
 from app.ai.groq_provider import investigate_with_groq
-from app.ai.cloudflare_provider import investigate_with_cloudflare
-
+from app.ai.openrouter_provider import investigate_with_openrouter
 
 class InvestigationState(TypedDict):
     incident_id: str
@@ -58,7 +57,7 @@ def analyze_node(state: InvestigationState) -> InvestigationState:
     providers = {
         "ollama": investigate_with_local_ai,
         "groq": investigate_with_groq,
-        "cloudflare": investigate_with_cloudflare,
+        "openrouter": investigate_with_openrouter,
     }
 
     if provider not in providers:
