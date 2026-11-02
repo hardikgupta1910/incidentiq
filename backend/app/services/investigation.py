@@ -6,14 +6,14 @@ from app.schemas import (
     Severity,
 )
 import logging
-from app.services.ollama_provider import investigate_with_local_ai
+from app.ai.ollama_provider import investigate_with_local_ai
 from app.services.retrieval import retrieve_runbook_context
 from app.settings import settings
 
 
 def call_hosted_provider(*args, **kwargs):
-    raise RuntimeError(
-        "Hosted provider calls require privacy mode to be disabled."
+    raise NotImplementedError(
+        "Hosted model adapters are not configured yet."
     )
 
 logger = logging.getLogger(__name__)
@@ -108,37 +108,53 @@ def investigate_with_rules(incident: Incident) -> InvestigationResult:
     )
 
 
-def investigate_incident(incident:Incident)-> InvestigationResult:
+def investigate_incident(
+    incident: Incident,
+    *,
+    provider: str = "local",
+    cloud_opt_in: bool = False,
+) -> InvestigationResult:
+    if provider not in {"local", "hosted"}:
+        raise ValueError("Provider must be 'local' or 'hosted'.")
 
-    if settings.local_privacy_mode:
-        raise PermissionError(
-            "Local privacy mode is enabled. "
-            "Hosted provider inference is not allowed."
-        )
+    # Enforce privacy before retrieving or sending incident context.
+    if provider == "hosted":
+        if settings.local_privacy_mode:
+            raise PermissionError(
+                "Local privacy mode is enabled. "
+                "Hosted provider inference is not allowed."
+            )
 
+        if not cloud_opt_in:
+            raise PermissionError(
+                "Hosted inference requires explicit cloud opt-in."
+            )
+
+        # Remains unavailable until hosted adapters are implemented.
+        return call_hosted_provider(incident=incident)
 
     log_text = "\n".join(
-    f"Line {event.line_number}: {event.message}"
-    for event in incident.events
-)
+        f"Line {event.line_number}: {event.message}"
+        for event in incident.events
+    )
 
     runbook_context, retrieved_sources = retrieve_runbook_context(log_text)
 
     try:
         ai_result = investigate_with_local_ai(
-        incident_id=str(incident.id),
-        log_text=log_text,
-        runbook_context=runbook_context,
+            incident_id=str(incident.id),
+            log_text=log_text,
+            runbook_context=runbook_context,
         )
 
         return ai_result.model_copy(
             update={"retrieved_sources": retrieved_sources}
         )
+
     except Exception:
         logger.exception(
-            "Local AI investigation failed for incident %s; using rule-based fallback.",
+            "Local AI investigation failed for incident %s; "
+            "using rule-based fallback.",
             incident.id,
         )
         return investigate_with_rules(incident)
-
-      

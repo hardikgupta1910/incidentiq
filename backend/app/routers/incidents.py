@@ -8,8 +8,10 @@ from app.schemas import Incident, InvestigationResult, Severity
 from app.services.investigation import investigate_incident
 from app.services.log_parser import parse_logs
 from app.storage import create_incident, get_incident, save_investigation
-from app.data.seed_incidents import SEED_INCIDENTS
-
+from app.data.seed_incidents import (
+    SEED_INCIDENTS,
+    database_connection_incident,
+)
 router = APIRouter(prefix="/api/incidents", tags=["Incidents"])
 
 ALLOWED_EXTENSIONS = {".log", ".txt"}
@@ -68,6 +70,25 @@ def list_seed_incidents():
     return SEED_INCIDENTS
 
 
+@router.post(
+    "/seed/{scenario_key}",
+    response_model=Incident,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_seed_incident(
+    scenario_key: str,
+    db: Session = Depends(get_db),
+) -> Incident:
+    if scenario_key != "database-connection":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Seed scenario not found.",
+        )
+
+    incident = database_connection_incident()
+
+    return create_incident(db, incident)
+
 
 
 @router.get("/{incident_id}", response_model=Incident)
@@ -109,7 +130,6 @@ def investigate(
         result=result
     )
 
-    # This update function comes next; leave these two lines out for now.
     return result
 
 

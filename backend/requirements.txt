@@ -2,10 +2,13 @@ fastapi
 uvicorn[standard]
 python-multipart
 pydantic
+pydantic-settings
+python-dotenv
 openai
 qdrant-client
 sqlalchemy
 pymysql
-pytest
 httpx
-pydantic-settings
+requests
+langgraph
+pytest

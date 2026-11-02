@@ -1,4 +1,4 @@
-from app.services.ollama_provider import investigate_with_local_ai
+from backend.app.ai.ollama_provider import investigate_with_local_ai
 
 log_text = """\
 2026-10-28 20:12:45 INFO service=payment Payment service started

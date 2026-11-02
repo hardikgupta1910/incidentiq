@@ -3,30 +3,30 @@ from enum import Enum
 from typing import Optional
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field,model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class Severity(str, Enum):
-    INFO="INFO"
-    WARNING="WARNING"
-    ERROR="ERROR"
-    CRITICAL="CRITICAL"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
 
 
 class LogEvent(BaseModel):
-    line_number:int
-    timestamp: Optional[datetime]=None
-    severity: Severity=Severity.INFO
-    service:Optional[str]=None
+    line_number: int
+    timestamp: Optional[datetime] = None
+    severity: Severity = Severity.INFO
+    service: Optional[str] = None
     message: str
 
 
 class EvidenceReference(BaseModel):
-    source_type:str
+    source_type: str
     line_number: Optional[int] = None
     source_file: Optional[str] = None
     chunk_index: Optional[int] = None
-    message:str
+    message: str
 
 
 class Hypothesis(BaseModel):
@@ -52,6 +52,7 @@ class Hypothesis(BaseModel):
 
         return self
 
+
 class RetrievedSource(BaseModel):
     source_file: str
     chunk_index: int
@@ -60,25 +61,19 @@ class RetrievedSource(BaseModel):
 
 
 class InvestigationResult(BaseModel):
-    incident_id:UUID
+    incident_id: UUID
     status: str
     hypotheses: list[Hypothesis]
     retrieved_sources: list[RetrievedSource] = []
 
+
 class Incident(BaseModel):
-    id: UUID=Field(default_factory=uuid4)
-    title:str
-    status:str="created"
-    created_at:datetime=Field(default_factory=datetime.now)
-    source_filename:str
-    total_log_lines:int
-    error_count:int
+    id: UUID = Field(default_factory=uuid4)
+    title: str
+    status: str = "created"
+    created_at: datetime = Field(default_factory=datetime.now)
+    source_filename: str
+    total_log_lines: int
+    error_count: int
     events: list[LogEvent]
     investigation: Optional[InvestigationResult] = None
-
-
-
-
-
-
-
