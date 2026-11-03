@@ -92,3 +92,16 @@ class PrivacyPolicyRecord(Base):
         nullable=False,
         default=True,
     )
+
+class InvestigationHistoryRecord(Base):
+    __tablename__ = "investigation_history"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid4())
+    )
+    incident_id: Mapped[str] = mapped_column(
+        String(36), nullable=False, index=True
+    )
+    status: Mapped[str] = mapped_column(String(50), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    result: Mapped[dict] = mapped_column(JSON, nullable=False)

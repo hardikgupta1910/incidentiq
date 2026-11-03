@@ -12,6 +12,8 @@ import ModelComparison from "./pages/ModelComparison";
 import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
 import Users from "./pages/Users";
+import KnowledgeBase from "./pages/KnowledgeBase";
+import InvestigationHistory from "./pages/InvestigationHistory";
 
 export default function App() {
   return (
@@ -43,6 +45,8 @@ export default function App() {
               element={<ModelComparison />}
             />
 
+            <Route path="investigation-history" element={<InvestigationHistory />} />
+            <Route path="knowledge-base" element={<KnowledgeBase />} />
             <Route path="settings" element={<Settings />} />
             <Route path="profile" element={<Profile />} />
             <Route path="users" element={<Users />} />

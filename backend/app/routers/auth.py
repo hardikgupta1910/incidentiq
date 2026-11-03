@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app.database import get_db
@@ -20,8 +20,10 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
 class RegisterRequest(BaseModel):
-    username: str
-    password: str
+    model_config = ConfigDict(extra="forbid")
+
+    username: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=1, max_length=1024)
     role: str = "engineer"
 
 
@@ -36,10 +38,10 @@ def register_user(
     request: RegisterRequest,
     db: Session = Depends(get_db),
 ):
-    if request.role not in {"engineer", "admin"}:
+    if request.role != "engineer":
         raise HTTPException(
             status_code=400,
-            detail="Role must be engineer or admin",
+            detail="Public registration can only create engineer accounts.",
         )
 
     existing_user = (
@@ -57,7 +59,7 @@ def register_user(
     user = UserRecord(
         username=request.username,
         hashed_password=hash_password(request.password),
-        role=request.role,
+        role="engineer",
     )
 
     db.add(user)

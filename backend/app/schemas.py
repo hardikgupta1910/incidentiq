@@ -65,6 +65,7 @@ class InvestigationResult(BaseModel):
     status: str
     hypotheses: list[Hypothesis]
     retrieved_sources: list[RetrievedSource] = []
+    analysis_source: Optional[str] = None
 
 
 class Incident(BaseModel):

@@ -1,5 +1,6 @@
 import { useAuth } from "../context/AuthContext";
 
+
 export default function Profile() {
   const { user } = useAuth();
 
@@ -25,6 +26,7 @@ export default function Profile() {
           </div>
         ))}
       </dl>
+     
     </div>
   );
 }

@@ -1,8 +1,9 @@
 from uuid import UUID
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from app.models import IncidentRecord
+from app.models import IncidentRecord, InvestigationHistoryRecord
 from app.schemas import Incident
 from app.schemas import InvestigationResult
 
@@ -67,6 +68,13 @@ def save_investigation(db:Session, incident_id:UUID, result:InvestigationResult)
 
     record.investigation=result.model_dump(mode="json")
     record.status="completed"
+
+    db.add(InvestigationHistoryRecord(
+        incident_id=str(incident_id),
+        status=result.status,
+        recorded_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        result=result.model_dump(mode="json"),
+    ))
 
     try:
         db.commit()

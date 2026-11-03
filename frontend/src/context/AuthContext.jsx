@@ -2,11 +2,12 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
 import authService from "../services/authService";
-import { setAccessToken } from "../services/api";
+import { onUnauthorized, setAccessToken } from "../services/api";
 
 const AuthContext = createContext(null);
 
@@ -17,6 +18,8 @@ export function AuthProvider({ children }) {
     setAccessToken(null);
     setUser(null);
   }, []);
+
+  useEffect(() => onUnauthorized(logout), [logout]);
 
   const login = useCallback(async ({ username, password }) => {
     setAccessToken(null);

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   Activity,
+  BookOpen,
+  History,
   FileText,
   FlaskConical,
   LayoutDashboard,
@@ -24,6 +26,8 @@ import {
 import { useAuth } from "../../context/AuthContext";
 
 const navigation = [
+  { to: "/knowledge-base", label: "Knowledge Base", icon: BookOpen },
+  { to: "/investigation-history", label: "Investigation History", icon: History },
   {
     to: "/",
     label: "Overview",
@@ -151,7 +155,11 @@ export default function AppLayout() {
 );
 
   const pageLabel =
-  location.pathname === "/"
+  location.pathname.startsWith("/knowledge-base")
+    ? "Knowledge Base"
+    : location.pathname.startsWith("/investigation-history")
+    ? "Investigation History"
+    : location.pathname === "/"
     ? "Overview"
     : location.pathname.startsWith("/model-comparison")
       ? "Model Comparison"

@@ -18,6 +18,13 @@ const api = axios.create({
 
 let accessToken = null;
 
+export function onUnauthorized(listener) {
+  unauthorizedListeners.add(listener);
+  return () => unauthorizedListeners.delete(listener);
+}
+
+const unauthorizedListeners = new Set();
+
 export function setAccessToken(token) {
   accessToken = token || null;
 }
@@ -29,6 +36,23 @@ api.interceptors.request.use((config) => {
 
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const authorization = error.config?.headers?.Authorization;
+    if (
+      error.response?.status === 401 &&
+      !error.config?.skipAuth &&
+      accessToken &&
+      authorization === `Bearer ${accessToken}`
+    ) {
+      accessToken = null;
+      unauthorizedListeners.forEach((listener) => listener());
+    }
+    return Promise.reject(error);
+  }
+);
 
 export function getApiErrorMessage(error) {
   if (axios.isCancel(error)) {

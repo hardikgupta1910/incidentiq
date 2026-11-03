@@ -1,4 +1,6 @@
 from contextlib import asynccontextmanager
+from app.routers.knowledge import router as knowledge_router
+from app.routers.investigation_history import router as investigation_history_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 from app.routers.auth import router as auth_router
@@ -34,6 +36,8 @@ app.add_middleware(
 )
 
 
+app.include_router(investigation_history_router)
+app.include_router(knowledge_router)
 app.include_router(incidents_router)
 app.include_router(incident_listing_router)
 app.include_router(health_router)

@@ -105,8 +105,8 @@ def investigate_with_rules(incident: Incident) -> InvestigationResult:
         incident_id=incident.id,
         status="completed",
         hypotheses=hypotheses,
+        analysis_source="rule_based_fallback",
     )
-
 
 def investigate_incident(
     incident: Incident,
@@ -148,7 +148,10 @@ def investigate_incident(
         )
 
         return ai_result.model_copy(
-            update={"retrieved_sources": retrieved_sources}
+            update={
+                "retrieved_sources": retrieved_sources,
+                "analysis_source": "local_ai",
+            }
         )
 
     except Exception:
