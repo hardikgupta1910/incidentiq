@@ -1,6 +1,9 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
+import pytest
+
+pytestmark = pytest.mark.usefixtures("authenticated_engineer")
 
 
 def test_unknown_incident_returns_404():

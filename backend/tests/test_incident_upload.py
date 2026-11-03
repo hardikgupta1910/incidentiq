@@ -1,7 +1,9 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
+import pytest
 
+pytestmark = pytest.mark.usefixtures("authenticated_engineer")
 
 def test_rejects_unsupported_file_extension():
     with TestClient(app) as client:

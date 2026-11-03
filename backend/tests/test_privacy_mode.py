@@ -2,6 +2,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from app.graph import investigation_graph as workflow
 from app.schemas import Incident, InvestigationResult
 from app.services import investigation
 
@@ -19,35 +20,28 @@ def incident():
 
 def test_privacy_mode_allows_local_inference(monkeypatch, incident):
     monkeypatch.setattr(
-        investigation.settings,
-        "local_privacy_mode",
-        True,
+        investigation,
+        "privacy_mode_enabled",
+        lambda: True,
     )
 
     expected = InvestigationResult(
         incident_id=incident.id,
         status="completed",
         hypotheses=[],
+        retrieved_sources=[],
+        analysis_source="local_ai",
     )
 
-    local_call = Mock(return_value=expected)
-    hosted_call = Mock()
-    retrieval = Mock(return_value=("", []))
+    graph = Mock()
+    graph.invoke.return_value = {"final_result": expected}
+    monkeypatch.setattr(workflow, "investigation_graph", graph)
 
-    monkeypatch.setattr(
-        investigation,
-        "investigate_with_local_ai",
-        local_call,
-    )
+    hosted = Mock()
     monkeypatch.setattr(
         investigation,
         "call_hosted_provider",
-        hosted_call,
-    )
-    monkeypatch.setattr(
-        investigation,
-        "retrieve_runbook_context",
-        retrieval,
+        hosted,
     )
 
     result = investigation.investigate_incident(
@@ -55,30 +49,27 @@ def test_privacy_mode_allows_local_inference(monkeypatch, incident):
         provider="local",
     )
 
-    assert result.incident_id == incident.id
-    local_call.assert_called_once()
-    hosted_call.assert_not_called()
+    assert result is expected
+    graph.invoke.assert_called_once()
+    assert graph.invoke.call_args.args[0]["incident"] is incident
+    hosted.assert_not_called()
 
 
 def test_privacy_mode_blocks_hosted_inference(monkeypatch, incident):
     monkeypatch.setattr(
-        investigation.settings,
-        "local_privacy_mode",
-        True,
+        investigation,
+        "privacy_mode_enabled",
+        lambda: True,
     )
 
-    hosted_call = Mock()
-    retrieval = Mock()
+    graph = Mock()
+    monkeypatch.setattr(workflow, "investigation_graph", graph)
 
+    hosted = Mock()
     monkeypatch.setattr(
         investigation,
         "call_hosted_provider",
-        hosted_call,
-    )
-    monkeypatch.setattr(
-        investigation,
-        "retrieve_runbook_context",
-        retrieval,
+        hosted,
     )
 
     with pytest.raises(PermissionError, match="Local privacy mode"):
@@ -88,23 +79,25 @@ def test_privacy_mode_blocks_hosted_inference(monkeypatch, incident):
             cloud_opt_in=True,
         )
 
-    hosted_call.assert_not_called()
-    retrieval.assert_not_called()
+    hosted.assert_not_called()
+    graph.invoke.assert_not_called()
 
 
 def test_hosted_inference_requires_cloud_opt_in(monkeypatch, incident):
     monkeypatch.setattr(
-        investigation.settings,
-        "local_privacy_mode",
-        False,
+        investigation,
+        "privacy_mode_enabled",
+        lambda: False,
     )
 
-    hosted_call = Mock()
+    graph = Mock()
+    monkeypatch.setattr(workflow, "investigation_graph", graph)
 
+    hosted = Mock()
     monkeypatch.setattr(
         investigation,
         "call_hosted_provider",
-        hosted_call,
+        hosted,
     )
 
     with pytest.raises(PermissionError, match="explicit cloud opt-in"):
@@ -114,4 +107,5 @@ def test_hosted_inference_requires_cloud_opt_in(monkeypatch, incident):
             cloud_opt_in=False,
         )
 
-    hosted_call.assert_not_called()
+    hosted.assert_not_called()
+    graph.invoke.assert_not_called()

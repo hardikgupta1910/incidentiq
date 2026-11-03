@@ -2,6 +2,9 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
+import pytest
+
+pytestmark = pytest.mark.usefixtures("authenticated_engineer")
 
 def test_seed_incidents_endpoint_returns_known_scenario():
     with TestClient(app) as client:
