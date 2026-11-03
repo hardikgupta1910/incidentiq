@@ -19,10 +19,19 @@ export function normalizeApiData(value) {
 }
 
 const investigationService = {
-  async investigate(incidentId) {
+      async investigate(
+    incidentId,
+    {
+      provider = "ollama",
+      confirmExternalProcessing = false,
+    } = {}
+  ) {
     const response = await api.post(
       `/api/incidents/${encodeURIComponent(incidentId)}/investigate`,
-      null,
+      {
+        provider,
+        confirm_external_processing: confirmExternalProcessing,
+      },
       { timeout: 0 }
     );
 

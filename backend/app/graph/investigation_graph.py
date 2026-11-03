@@ -5,6 +5,7 @@ from langgraph.graph import END, StateGraph
 
 from app.ai.ollama_provider import investigate_with_local_ai
 from app.schemas import Incident, InvestigationResult, RetrievedSource, Severity
+from app.services.privacy import ensure_provider_allowed
 from app.services.retrieval import retrieve_runbook_context
 
 logger = logging.getLogger(__name__)
@@ -12,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 class InvestigationState(TypedDict, total=False):
     incident: Incident
+    provider: str
+    cloud_opt_in: bool
     runbook_context: str
     retrieved_sources: list[RetrievedSource]
     analysis_result: InvestigationResult | None
@@ -19,19 +22,33 @@ class InvestigationState(TypedDict, total=False):
     failure_stage: str | None
 
 
-def retrieve_evidence_node(state: InvestigationState) -> dict:
-    incident = state["incident"]
+def authorize_node(state):
+    provider = state.get("provider", "ollama")
 
-    relevant_events = [
+    if provider not in {"ollama", "groq", "mistral"}:
+        raise ValueError("Unknown investigation provider.")
+
+    if provider != "ollama":
+        ensure_provider_allowed(provider)
+
+        if not state.get("cloud_opt_in", False):
+            raise PermissionError(
+                "Cloud investigation requires explicit confirmation."
+            )
+
+    return {"provider": provider}
+
+
+def retrieve_evidence_node(state):
+    incident = state["incident"]
+    relevant = [
         event
         for event in incident.events
         if event.severity
         in {Severity.WARNING, Severity.ERROR, Severity.CRITICAL}
     ]
-
     query = "\n".join(
-        event.message
-        for event in (relevant_events or incident.events)[:10]
+        event.message for event in (relevant or incident.events)[:10]
     )
 
     try:
@@ -43,17 +60,20 @@ def retrieve_evidence_node(state: InvestigationState) -> dict:
             }
 
         context, sources = retrieve_runbook_context(query)
-
         return {
             "runbook_context": context,
             "retrieved_sources": sources,
             "failure_stage": None,
         }
     except Exception:
-        logger.exception(
-            "Knowledge retrieval failed for incident %s",
-            incident.id,
-        )
+        logger.exception("Retrieval failed for incident %s", incident.id)
+
+        if state["provider"] != "ollama":
+            raise RuntimeError(
+                "Ollama embedding or Qdrant retrieval failed. "
+                "The selected cloud provider was not called."
+            ) from None
+
         return {
             "runbook_context": "",
             "retrieved_sources": [],
@@ -61,43 +81,55 @@ def retrieve_evidence_node(state: InvestigationState) -> dict:
         }
 
 
-def route_after_retrieval(state: InvestigationState) -> str:
+def route_after_retrieval(state):
     return "fallback" if state.get("failure_stage") else "analyze"
 
 
-def analyze_node(state: InvestigationState) -> dict:
+def analyze_node(state):
     incident = state["incident"]
+    provider = state["provider"]
 
-    # Use original parsed events to preserve evidence text and line numbers.
-    # This graph supports local Ollama only; it has no cloud-provider branch.
+    if provider == "ollama":
+        adapter = investigate_with_local_ai
+    else:
+        # Recheck policy immediately before cloud inference.
+        ensure_provider_allowed(provider)
+
+        if provider == "groq":
+            from app.ai.groq_provider import investigate_with_groq
+            adapter = investigate_with_groq
+        else:
+            from app.ai.mistral_provider import investigate_with_mistral
+            adapter = investigate_with_mistral
+
     log_text = "\n".join(
         f"Line {event.line_number}: {event.message}"
         for event in incident.events
     )
 
     try:
-        result = investigate_with_local_ai(
+        result = adapter(
             incident_id=str(incident.id),
             log_text=log_text,
             runbook_context=state.get("runbook_context", ""),
         )
-
-        return {
-            "analysis_result": result,
-            "failure_stage": None,
-        }
+        return {"analysis_result": result, "failure_stage": None}
     except Exception:
         logger.exception(
-            "Local AI inference failed for incident %s",
-            incident.id,
+            "Provider %s failed for incident %s", provider, incident.id
         )
-        return {
-            "analysis_result": None,
-            "failure_stage": "inference",
-        }
+
+        if provider != "ollama":
+            raise RuntimeError(
+                f"{provider.title()} investigation failed. "
+                "Check backend logs and provider configuration. "
+                "No other analysis provider was called."
+            ) from None
+
+        return {"analysis_result": None, "failure_stage": "inference"}
 
 
-def validate_output_node(state: InvestigationState) -> dict:
+def validate_output_node(state):
     incident = state["incident"]
 
     if state.get("analysis_result") is None:
@@ -107,28 +139,21 @@ def validate_output_node(state: InvestigationState) -> dict:
         }
 
     try:
-        candidate = state["analysis_result"]
-
-        # Revalidate even if the provider returned an existing model instance.
         result = InvestigationResult.model_validate(
-            candidate.model_dump(mode="json")
+            state["analysis_result"].model_dump(mode="json")
         )
 
         if result.incident_id != incident.id:
-            raise ValueError("Result belongs to a different incident.")
+            raise ValueError("Incorrect incident ID.")
 
-        if result.status != "completed":
-            raise ValueError("Investigation did not complete.")
+        if result.status != "completed" or not result.hypotheses:
+            raise ValueError("Incomplete investigation.")
 
-        if not result.hypotheses:
-            raise ValueError("No hypotheses were returned.")
-
-        ranks = [hypothesis.rank for hypothesis in result.hypotheses]
-
+        ranks = [item.rank for item in result.hypotheses]
         if any(rank < 1 for rank in ranks) or len(set(ranks)) != len(ranks):
-            raise ValueError("Hypothesis ranks must be positive and unique.")
+            raise ValueError("Invalid hypothesis ranks.")
 
-        original_events = {
+        original = {
             event.line_number: event.message
             for event in incident.events
         }
@@ -136,90 +161,87 @@ def validate_output_node(state: InvestigationState) -> dict:
         for hypothesis in result.hypotheses:
             for evidence in hypothesis.evidence:
                 if evidence.source_type != "log":
-                    raise ValueError("Incident evidence must reference logs.")
-
-                if evidence.line_number not in original_events:
-                    raise ValueError("Evidence references an unknown log line.")
-
-                if evidence.message != original_events[evidence.line_number]:
+                    raise ValueError("Evidence must reference logs.")
+                if evidence.line_number not in original:
+                    raise ValueError("Unknown evidence line.")
+                if evidence.message != original[evidence.line_number]:
                     raise ValueError("Evidence text does not match the log.")
 
-        # The application—not the model—sets provenance and retrieved sources.
-        result = result.model_copy(
-            update={
-                "retrieved_sources": state.get("retrieved_sources", []),
-                "analysis_source": "local_ai",
-            }
-        )
+        provider = state["provider"]
 
         return {
-            "final_result": result,
+            "final_result": result.model_copy(
+                update={
+                    "retrieved_sources": state.get("retrieved_sources", []),
+                    "analysis_source": (
+                        "local_ai" if provider == "ollama" else provider
+                    ),
+                    "requested_provider": provider,
+                }
+            ),
             "failure_stage": None,
         }
     except Exception:
         logger.exception(
-            "Local AI output validation failed for incident %s",
+            "Provider output validation failed for incident %s",
             incident.id,
         )
-        return {
-            "final_result": None,
-            "failure_stage": "validation",
-        }
+
+        if state["provider"] != "ollama":
+            raise RuntimeError(
+                "The selected cloud provider returned invalid evidence "
+                "or an invalid result. No other provider was called."
+            ) from None
+
+        return {"final_result": None, "failure_stage": "validation"}
 
 
-def route_after_validation(state: InvestigationState) -> str:
+def route_after_validation(state):
     return "report" if state.get("final_result") is not None else "fallback"
 
 
-def fallback_node(state: InvestigationState) -> dict:
-    # Lazy import avoids a graph/service import cycle.
+def fallback_node(state):
     from app.services.investigation import investigate_with_rules
 
-    incident = state["incident"]
-
     logger.warning(
-        "Using rule-based fallback for incident %s after %s failure",
-        incident.id,
-        state.get("failure_stage") or "unknown",
+        "Local rule fallback for incident %s after %s",
+        state["incident"].id,
+        state.get("failure_stage"),
     )
 
-    result = investigate_with_rules(incident).model_copy(
+    result = investigate_with_rules(state["incident"]).model_copy(
         update={
             "retrieved_sources": state.get("retrieved_sources", []),
             "analysis_source": "rule_based_fallback",
+            "requested_provider": state["provider"],
         }
     )
-
     return {"final_result": result}
 
 
-def report_node(state: InvestigationState) -> dict:
-    result = state.get("final_result")
-
-    if result is None:
-        raise RuntimeError("Workflow finished without an investigation result.")
-
-    return {"final_result": result}
+def report_node(state):
+    if state.get("final_result") is None:
+        raise RuntimeError("Workflow returned no result.")
+    return {"final_result": state["final_result"]}
 
 
 def build_investigation_graph():
     graph = StateGraph(InvestigationState)
 
+    graph.add_node("authorize", authorize_node)
     graph.add_node("retrieve_evidence", retrieve_evidence_node)
     graph.add_node("analyze", analyze_node)
     graph.add_node("validate_output", validate_output_node)
     graph.add_node("fallback", fallback_node)
     graph.add_node("report", report_node)
 
-    graph.set_entry_point("retrieve_evidence")
+    graph.set_entry_point("authorize")
+    graph.add_edge("authorize", "retrieve_evidence")
 
     graph.add_conditional_edges(
         "retrieve_evidence",
         route_after_retrieval,
-        {
-            "analyze": "analyze",
-            "fallback": "fallback",
-        },
+        {"analyze": "analyze", "fallback": "fallback"},
     )
 
     graph.add_edge("analyze", "validate_output")
@@ -227,10 +249,7 @@ def build_investigation_graph():
     graph.add_conditional_edges(
         "validate_output",
         route_after_validation,
-        {
-            "report": "report",
-            "fallback": "fallback",
-        },
+        {"report": "report", "fallback": "fallback"},
     )
 
     graph.add_edge("fallback", "report")

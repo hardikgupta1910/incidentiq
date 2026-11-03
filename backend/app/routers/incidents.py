@@ -4,6 +4,14 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 from app.auth.security import get_current_user
 from app.database import get_db
+from typing import Literal
+
+from pydantic import BaseModel, StrictBool
+
+from app.services.privacy import PrivacyViolation
+
+
+
 from app.schemas import Incident, InvestigationResult, Severity
 from app.services.investigation import investigate_incident
 from app.services.log_parser import parse_logs
@@ -108,12 +116,18 @@ def get_incident_route(incident_id: UUID,db: Session = Depends(get_db),) -> Inci
     return incident
 
 
+class InvestigationRequest(BaseModel):
+    provider: Literal["ollama", "groq", "mistral"] = "ollama"
+    confirm_external_processing: StrictBool = False
+
+
 @router.post(
     "/{incident_id}/investigate",
     response_model=InvestigationResult,
 )
 def investigate(
     incident_id: UUID,
+    request: InvestigationRequest | None = None,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> InvestigationResult:
@@ -121,19 +135,33 @@ def investigate(
 
     if incident is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Incident not found. Upload the log again before investigating.",
+            status_code=404,
+            detail="Incident not found.",
         )
 
-    result = investigate_incident(incident)
+    options = request or InvestigationRequest()
 
+    try:
+        result = investigate_incident(
+            incident,
+            provider=options.provider,
+            cloud_opt_in=options.confirm_external_processing,
+        )
+    except (PrivacyViolation, PermissionError) as error:
+        raise HTTPException(
+            status_code=403,
+            detail=str(error),
+        ) from error
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=502,
+            detail=str(error),
+        ) from error
 
     save_investigation(
         db=db,
         incident_id=incident_id,
-        result=result
+        result=result,
     )
 
     return result
-
-

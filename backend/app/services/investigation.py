@@ -117,30 +117,31 @@ def investigate_incident(
     provider: str = "local",
     cloud_opt_in: bool = False,
 ) -> InvestigationResult:
-    if provider not in {"local", "hosted"}:
-        raise ValueError("Provider must be 'local' or 'hosted'.")
-
-    # Keep the existing hosted-provider restrictions.
+    # Preserve the existing legacy hosted-path restrictions.
     if provider == "hosted":
         if privacy_mode_enabled():
             raise PermissionError(
                 "Local privacy mode is enabled. "
                 "Hosted provider inference is not allowed."
             )
-
         if not cloud_opt_in:
             raise PermissionError(
                 "Hosted inference requires explicit cloud opt-in."
             )
-
         return call_hosted_provider(incident=incident)
 
-    # Import here to avoid a graph/service import cycle.
+    provider = "ollama" if provider == "local" else provider
+
+    if provider not in {"ollama", "groq", "mistral"}:
+        raise ValueError("Unknown investigation provider.")
+
     from app.graph.investigation_graph import investigation_graph
 
     state = investigation_graph.invoke(
         {
             "incident": incident,
+            "provider": provider,
+            "cloud_opt_in": cloud_opt_in,
             "runbook_context": "",
             "retrieved_sources": [],
             "analysis_result": None,
@@ -150,10 +151,7 @@ def investigate_incident(
     )
 
     result = state.get("final_result")
-
     if not isinstance(result, InvestigationResult):
-        raise RuntimeError(
-            "Investigation workflow returned an invalid final result."
-        )
+        raise RuntimeError("Workflow returned an invalid result.")
 
     return result
