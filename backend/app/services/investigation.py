@@ -28,7 +28,10 @@ def investigate_with_rules(incident: Incident) -> InvestigationResult:
         event
         for event in error_events
         if "database" in event.message.lower()
-        and "timeout" in event.message.lower()
+        and any(
+            phrase in event.message.lower()
+            for phrase in ("timeout", "timed out")
+        )
     ]
 
     hypotheses: list[Hypothesis] = []
@@ -117,7 +120,7 @@ def investigate_incident(
     if provider not in {"local", "hosted"}:
         raise ValueError("Provider must be 'local' or 'hosted'.")
 
-    # Enforce privacy before retrieving or sending incident context.
+    # Keep the existing hosted-provider restrictions.
     if provider == "hosted":
         if privacy_mode_enabled():
             raise PermissionError(
@@ -130,34 +133,27 @@ def investigate_incident(
                 "Hosted inference requires explicit cloud opt-in."
             )
 
-        # Remains unavailable until hosted adapters are implemented.
         return call_hosted_provider(incident=incident)
 
-    log_text = "\n".join(
-        f"Line {event.line_number}: {event.message}"
-        for event in incident.events
+    # Import here to avoid a graph/service import cycle.
+    from app.graph.investigation_graph import investigation_graph
+
+    state = investigation_graph.invoke(
+        {
+            "incident": incident,
+            "runbook_context": "",
+            "retrieved_sources": [],
+            "analysis_result": None,
+            "final_result": None,
+            "failure_stage": None,
+        }
     )
 
-    runbook_context, retrieved_sources = retrieve_runbook_context(log_text)
+    result = state.get("final_result")
 
-    try:
-        ai_result = investigate_with_local_ai(
-            incident_id=str(incident.id),
-            log_text=log_text,
-            runbook_context=runbook_context,
+    if not isinstance(result, InvestigationResult):
+        raise RuntimeError(
+            "Investigation workflow returned an invalid final result."
         )
 
-        return ai_result.model_copy(
-            update={
-                "retrieved_sources": retrieved_sources,
-                "analysis_source": "local_ai",
-            }
-        )
-
-    except Exception:
-        logger.exception(
-            "Local AI investigation failed for incident %s; "
-            "using rule-based fallback.",
-            incident.id,
-        )
-        return investigate_with_rules(incident)
+    return result
