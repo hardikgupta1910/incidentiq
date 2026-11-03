@@ -12,7 +12,7 @@ from app.services.privacy import ensure_provider_allowed, PrivacyViolation
 
 from app.ai.ollama_provider import investigate_with_local_ai
 from app.ai.groq_provider import investigate_with_groq
-from app.ai.openrouter_provider import investigate_with_openrouter
+from app.ai.mistral_provider import investigate_with_mistral
 
 router = APIRouter(prefix="/api/evaluations", tags=["Evaluations"])
 
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/evaluations", tags=["Evaluations"])
 PROVIDERS = {
     "ollama": investigate_with_local_ai,
     "groq": investigate_with_groq,
-    "openrouter": investigate_with_openrouter,
+    "mistral": investigate_with_mistral,
 }
 
 
@@ -85,7 +85,7 @@ def calculate_diagnosis_quality(
 def run_evaluation(
     incident_id: UUID,
     providers: str = Query(
-        default="ollama,groq,openrouter",
+        default="ollama,groq,mistral",
         description="Comma-separated providers to evaluate",
     ),
     db: Session = Depends(get_db),

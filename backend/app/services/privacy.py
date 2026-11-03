@@ -7,7 +7,7 @@ from app.models import PrivacyPolicyRecord
 from app.settings import settings
 
 
-CLOUD_PROVIDERS = {"groq", "openrouter"}
+CLOUD_PROVIDERS = {"groq", "mistral"}
 
 
 class PrivacyViolation(Exception):
@@ -60,7 +60,7 @@ def get_privacy_policy() -> dict:
         "allowed_providers": (
             ["ollama"]
             if enabled
-            else ["ollama", "groq", "openrouter"]
+            else ["ollama", "groq", "mistral"]
         ),
     }
 

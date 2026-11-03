@@ -26,8 +26,8 @@ const PROVIDERS = [
     description: "Cloud provider",
   },
   {
-    id: "openrouter",
-    label: "OpenRouter",
+    id: "mistral",
+    label: "mistral",
     description: "Cloud provider",
   },
 ];

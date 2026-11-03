@@ -1,18 +1,29 @@
+import os
 from openai import OpenAI
 from qdrant_client import QdrantClient
 
 from app.schemas import RetrievedSource
 
 
+
 COLLECTION_NAME = "runbooks"
 EMBEDDING_MODEL = "nomic-embed-text:latest"
 
+# ollama_client = OpenAI(
+#     base_url="http://localhost:11434/v1",
+#     api_key="ollama",
+# )
+
+# qdrant_client = QdrantClient(url="http://localhost:6333")
+
 ollama_client = OpenAI(
-    base_url="http://localhost:11434/v1",
+    base_url=f"{os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434').rstrip('/')}/v1",
     api_key="ollama",
 )
 
-qdrant_client = QdrantClient(url="http://localhost:6333")
+qdrant_client = QdrantClient(
+    url=os.getenv("QDRANT_URL", "http://localhost:6333")
+)
 
 
 def retrieve_runbook_context(

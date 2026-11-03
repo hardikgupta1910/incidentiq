@@ -1,12 +1,19 @@
 from openai import OpenAI
 
 from app.schemas import InvestigationResult
+import os
 
+# MODEL_NAME = "qwen2.5:7b"
 
-MODEL_NAME = "qwen2.5:7b"
+# client = OpenAI(
+#     base_url="http://localhost:11434/v1",
+#     api_key="ollama",
+# )
+
+MODEL_NAME = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
 
 client = OpenAI(
-    base_url="http://localhost:11434/v1",
+    base_url=f"{os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434').rstrip('/')}/v1",
     api_key="ollama",
 )
 
