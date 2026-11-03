@@ -3,7 +3,7 @@ from uuid import uuid4
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, JSON, String
+from sqlalchemy import DateTime, Integer, JSON, String, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -75,4 +75,20 @@ class UserRecord(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=datetime.utcnow,
+    )
+
+
+
+class PrivacyPolicyRecord(Base):
+    __tablename__ = "privacy_policy"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
     )

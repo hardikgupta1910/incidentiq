@@ -8,7 +8,7 @@ from app.schemas import (
 import logging
 from app.ai.ollama_provider import investigate_with_local_ai
 from app.services.retrieval import retrieve_runbook_context
-from app.settings import settings
+from app.services.privacy import privacy_mode_enabled
 
 
 def call_hosted_provider(*args, **kwargs):
@@ -119,7 +119,7 @@ def investigate_incident(
 
     # Enforce privacy before retrieving or sending incident context.
     if provider == "hosted":
-        if settings.local_privacy_mode:
+        if privacy_mode_enabled():
             raise PermissionError(
                 "Local privacy mode is enabled. "
                 "Hosted provider inference is not allowed."

@@ -1,0 +1,166 @@
+--- a/backend/app/routers/auth.py
++++ b/backend/app/routers/auth.py
+@@ -4,7 +4,7 @@
+ import jwt
+ from fastapi import APIRouter, Depends, HTTPException, status
+ from fastapi.security import OAuth2PasswordRequestForm
+-from pydantic import BaseModel
++from pydantic import BaseModel, ConfigDict, Field
+ from sqlalchemy.orm import Session
+ from sqlalchemy import select
+ from app.database import get_db
+@@ -20,8 +20,10 @@
+ 
+ 
+ class RegisterRequest(BaseModel):
+-    username: str
+-    password: str
++    model_config = ConfigDict(extra="forbid")
++
++    username: str = Field(min_length=1, max_length=100)
++    password: str = Field(min_length=1, max_length=1024)
+     role: str = "engineer"
+ 
+ 
+@@ -36,10 +38,10 @@
+     request: RegisterRequest,
+     db: Session = Depends(get_db),
+ ):
+-    if request.role not in {"engineer", "admin"}:
++    if request.role != "engineer":
+         raise HTTPException(
+             status_code=400,
+-            detail="Role must be engineer or admin",
++            detail="Public registration can only create engineer accounts.",
+         )
+ 
+     existing_user = (
+@@ -57,7 +59,7 @@
+     user = UserRecord(
+         username=request.username,
+         hashed_password=hash_password(request.password),
+-        role=request.role,
++        role="engineer",
+     )
+ 
+     db.add(user)
+--- a/frontend/src/services/api.jsx
++++ b/frontend/src/services/api.jsx
+@@ -18,6 +18,13 @@
+ 
+ let accessToken = null;
+ 
++export function onUnauthorized(listener) {
++  unauthorizedListeners.add(listener);
++  return () => unauthorizedListeners.delete(listener);
++}
++
++const unauthorizedListeners = new Set();
++
+ export function setAccessToken(token) {
+   accessToken = token || null;
+ }
+@@ -29,6 +36,23 @@
+ 
+   return config;
+ });
++
++api.interceptors.response.use(
++  (response) => response,
++  (error) => {
++    const authorization = error.config?.headers?.Authorization;
++    if (
++      error.response?.status === 401 &&
++      !error.config?.skipAuth &&
++      accessToken &&
++      authorization === `Bearer ${accessToken}`
++    ) {
++      accessToken = null;
++      unauthorizedListeners.forEach((listener) => listener());
++    }
++    return Promise.reject(error);
++  }
++);
+ 
+ export function getApiErrorMessage(error) {
+   if (axios.isCancel(error)) {
+--- a/frontend/src/context/AuthContext.jsx
++++ b/frontend/src/context/AuthContext.jsx
+@@ -2,11 +2,12 @@
+   createContext,
+   useCallback,
+   useContext,
++  useEffect,
+   useMemo,
+   useState,
+ } from "react";
+ import authService from "../services/authService";
+-import { setAccessToken } from "../services/api";
++import { onUnauthorized, setAccessToken } from "../services/api";
+ 
+ const AuthContext = createContext(null);
+ 
+@@ -17,6 +18,8 @@
+     setAccessToken(null);
+     setUser(null);
+   }, []);
++
++  useEffect(() => onUnauthorized(logout), [logout]);
+ 
+   const login = useCallback(async ({ username, password }) => {
+     setAccessToken(null);
+--- /dev/null
++++ b/frontend/src/components/common/ErrorBoundary.jsx
+@@ -0,0 +1,31 @@
++import { Component } from "react";
++
++export default class ErrorBoundary extends Component {
++  state = { failed: false };
++
++  static getDerivedStateFromError() {
++    return { failed: true };
++  }
++
++  render() {
++    if (!this.state.failed) return this.props.children;
++
++    return (
++      <main className="flex min-h-screen items-center justify-center bg-canvas px-6 text-text-primary">
++        <section role="alert" className="w-full max-w-lg rounded-lg border border-line bg-surface p-8">
++          <p className="text-xs font-semibold uppercase tracking-widest text-accent">IncidentIQ</p>
++          <h1 className="mt-4 text-xl font-semibold">Unable to display this screen</h1>
++          <p className="mt-3 text-sm leading-6 text-text-secondary">
++            The interface encountered an unexpected error. Returning to the overview
++            will reload the application and may require you to sign in again.
++            A running backend investigation is not cancelled by this action.
++          </p>
++          <button type="button" onClick={() => window.location.assign("/")}
++            className="mt-6 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white">
++            Return to overview
++          </button>
++        </section>
++      </main>
++    );
++  }
++}
+--- a/frontend/src/main.jsx
++++ b/frontend/src/main.jsx
+@@ -2,12 +2,15 @@
+ import ReactDOM from "react-dom/client";
+ import { BrowserRouter } from "react-router-dom";
+ import App from "./App.jsx";
++import ErrorBoundary from "./components/common/ErrorBoundary";
+ import "./index.css";
+ 
+ ReactDOM.createRoot(document.getElementById("root")).render(
+   <React.StrictMode>
+-    <BrowserRouter>
+-      <App />
+-    </BrowserRouter>
++    <ErrorBoundary>
++      <BrowserRouter>
++        <App />
++      </BrowserRouter>
++    </ErrorBoundary>
+   </React.StrictMode>
+ );

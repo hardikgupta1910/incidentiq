@@ -12,6 +12,17 @@
   #root {
     min-height: 100%;
   }
+  html {
+  color-scheme: dark;
+}
+
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid #638bff;
+  outline-offset: 3px;
+}
 
   body {
     background-color: theme("colors.canvas");

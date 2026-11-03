@@ -1,29 +1,56 @@
+import { Navigate, Route, Routes } from "react-router-dom";
+
+import { AuthProvider } from "./context/AuthContext";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import AppLayout from "./components/layout/AppLayout";
+
+import AuthPage from "./pages/AuthPage";
+import Dashboard from "./pages/Dashboard";
+import Incidents from "./pages/Incidents";
+import IncidentDetails from "./pages/IncidentDetails";
+import ModelComparison from "./pages/ModelComparison";
+import Settings from "./pages/Settings";
+import Profile from "./pages/Profile";
+import Users from "./pages/Users";
+
 export default function App() {
   return (
-    <main className="flex min-h-screen items-center justify-center px-6">
-      <div className="w-full max-w-md rounded-lg border border-line bg-surface p-8">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-accent text-sm font-bold text-white">
-            IQ
-          </div>
-          <div>
-            <p className="text-base font-semibold text-text-primary">
-              IncidentIQ
-            </p>
-            <p className="text-xs text-text-secondary">
-              Engineering Intelligence
-            </p>
-          </div>
-        </div>
+    <AuthProvider>
+      <Routes>
+        <Route
+          path="/login"
+          element={<AuthPage key="login" mode="login" />}
+        />
 
-        <h1 className="mt-8 text-xl font-semibold tracking-tight">
-          Frontend foundation ready
-        </h1>
-        <p className="mt-2 text-sm leading-relaxed text-text-secondary">
-          The dark enterprise design system, Vite build setup, Tailwind tokens,
-          routing entry point, and application shell are now in place.
-        </p>
-      </div>
-    </main>
+        <Route
+          path="/register"
+          element={<AuthPage key="register" mode="register" />}
+        />
+
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AppLayout />}>
+            <Route index element={<Dashboard />} />
+
+            <Route path="incidents" element={<Incidents />} />
+
+            <Route
+              path="incidents/:incidentId"
+              element={<IncidentDetails />}
+            />
+
+            <Route
+              path="model-comparison"
+              element={<ModelComparison />}
+            />
+
+            <Route path="settings" element={<Settings />} />
+            <Route path="profile" element={<Profile />} />
+            <Route path="users" element={<Users />} />
+          </Route>
+        </Route>
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AuthProvider>
   );
 }
