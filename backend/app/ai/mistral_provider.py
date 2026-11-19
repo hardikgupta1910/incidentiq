@@ -15,10 +15,7 @@ load_dotenv(
 )
 
 
-def investigate_with_mistral(
-    incident_id: str,
-    log_text: str,
-    runbook_context: str,
+def investigate_with_mistral(incident_id: str,log_text: str,runbook_context: str,
 ) -> InvestigationResult:
     # Enforce policy before creating a request to an external provider.
     ensure_provider_allowed("mistral")

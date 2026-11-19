@@ -28,11 +28,7 @@ def get_groq_model():
     return os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
 
-def build_groq_user_prompt(
-    incident_id: str,
-    log_text: str,
-    runbook_context: str,
-) -> str:
+def build_groq_user_prompt(incident_id: str,log_text: str,runbook_context: str,) -> str:
     schema = json.dumps(
         InvestigationResult.model_json_schema(),
         indent=2,
